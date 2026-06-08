@@ -126,6 +126,23 @@ class RouteResponse(RouteBase):
         from_attributes = True
 
 
+class RouteRecommendRequest(BaseModel):
+    start_lat: Optional[float] = None
+    start_lng: Optional[float] = None
+    start_corner_id: Optional[int] = None
+    corner_count: int = 3
+    category: Optional[str] = None
+    difficulty: Optional[str] = None
+
+
+class RouteRecommendResponse(BaseModel):
+    corners: List[CornerResponse]
+    total_distance: float
+    estimated_time: int
+    order: List[int]
+    distances: List[float]
+
+
 class AchievementBase(BaseModel):
     name: str
     description: str

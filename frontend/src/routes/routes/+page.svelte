@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { auth } from '$lib/stores/auth';
   import { cornerStore } from '$lib/stores/corners';
-  import { getRoutes, createRoute, deleteRoute } from '$lib/api/routes';
+  import { getRoutes, createRoute, deleteRoute, recommendRoute } from '$lib/api/routes';
   import MapView from '$lib/components/MapView.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { toast } from '$lib/stores/toast';
@@ -23,6 +23,27 @@
   let mapMarkers = [];
   let selectedRoute = null;
   let routeMapMarkers = [];
+
+  let showRecommendModal = false;
+  let recommendingRoute = false;
+  let recommendResult = null;
+  let recommendStartType = 'current';
+  let recommendStartCornerId = null;
+  let recommendCornerCount = 3;
+  let recommendCategory = '';
+  let recommendDifficulty = '';
+  let currentLat = null;
+  let currentLng = null;
+  let recommendMapMarkers = [];
+  let savingRecommendRoute = false;
+
+  const categories = ['', '人文古迹', '自然风光', '文艺空间', '艺术创意', '体验工坊', '美食探店', '其他'];
+  const difficulties = [
+    { value: '', label: '全部难度' },
+    { value: 'easy', label: '简单' },
+    { value: 'medium', label: '中等' },
+    { value: 'hard', label: '困难' }
+  ];
 
   onMount(async () => {
     if (!$auth.isAuthenticated) {
@@ -158,6 +179,140 @@
     return corners.find(c => c.id === id);
   }
 
+  function getCurrentLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          currentLat = position.coords.latitude;
+          currentLng = position.coords.longitude;
+          toast.success('已获取当前位置');
+        },
+        (error) => {
+          toast.error('获取位置失败，请选择指定角落作为起点');
+          recommendStartType = 'corner';
+        }
+      );
+    } else {
+      toast.error('浏览器不支持定位功能');
+      recommendStartType = 'corner';
+    }
+  }
+
+  function updateRecommendMapMarkers(result) {
+    recommendMapMarkers = result.corners.map((corner, index) => ({
+      latitude: corner.latitude,
+      longitude: corner.longitude,
+      title: `${index + 1}. ${corner.title}`,
+      content: corner.description.substring(0, 50) + '...',
+      color: getRouteColor(index)
+    }));
+  }
+
+  async function handleRecommendRoute(e) {
+    e.preventDefault();
+
+    if (recommendStartType === 'current') {
+      if (!currentLat || !currentLng) {
+        toast.error('请先获取当前位置');
+        return;
+      }
+    } else {
+      if (!recommendStartCornerId) {
+        toast.error('请选择起点角落');
+        return;
+      }
+    }
+
+    recommendingRoute = true;
+    try {
+      const requestData = {
+        corner_count: recommendCornerCount
+      };
+
+      if (recommendStartType === 'current') {
+        requestData.start_lat = currentLat;
+        requestData.start_lng = currentLng;
+      } else {
+        requestData.start_corner_id = recommendStartCornerId;
+      }
+
+      if (recommendCategory) {
+        requestData.category = recommendCategory;
+      }
+      if (recommendDifficulty) {
+        requestData.difficulty = recommendDifficulty;
+      }
+
+      const result = await recommendRoute(requestData);
+      recommendResult = result;
+      updateRecommendMapMarkers(result);
+      toast.success('路线推荐成功！');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || '路线推荐失败');
+    } finally {
+      recommendingRoute = false;
+    }
+  }
+
+  async function handleSaveRecommendRoute() {
+    if (!recommendResult) return;
+
+    if (!title || !description) {
+      toast.error('请填写路线标题和描述');
+      return;
+    }
+
+    const validCornerIds = recommendResult.corners
+      .filter(c => c.id > 0)
+      .map(c => c.id);
+
+    if (validCornerIds.length < 2) {
+      toast.error('推荐路线中有效角落不足');
+      return;
+    }
+
+    savingRecommendRoute = true;
+    try {
+      const routeData = {
+        title,
+        description,
+        estimated_time: recommendResult.estimated_time,
+        distance: recommendResult.total_distance,
+        corner_ids: validCornerIds
+      };
+
+      await createRoute(routeData);
+      toast.success('路线保存成功！');
+      closeRecommendModal();
+      await loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || '保存路线失败');
+    } finally {
+      savingRecommendRoute = false;
+    }
+  }
+
+  function closeRecommendModal() {
+    showRecommendModal = false;
+    recommendResult = null;
+    recommendMapMarkers = [];
+    title = '';
+    description = '';
+  }
+
+  function openRecommendModal() {
+    showRecommendModal = true;
+    recommendResult = null;
+    recommendStartType = 'current';
+    recommendCornerCount = 3;
+    recommendCategory = '';
+    recommendDifficulty = '';
+    recommendStartCornerId = null;
+    currentLat = null;
+    currentLng = null;
+    getCurrentLocation();
+  }
+
   $: if (selectedCornerIds.length > 0 && corners.length > 0) {
     updateFormMapMarkers();
   }
@@ -177,15 +332,26 @@
       <div class="lg:col-span-1 space-y-6">
         <!-- Create Route Button/Form -->
         {#if !showCreateForm}
-          <button
-            on:click={() => showCreateForm = true}
-            class="w-full btn btn-primary py-4 text-lg flex items-center justify-center gap-2"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            创建新路线
-          </button>
+          <div class="space-y-3">
+            <button
+              on:click={() => showCreateForm = true}
+              class="w-full btn btn-primary py-4 text-lg flex items-center justify-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              创建新路线
+            </button>
+            <button
+              on:click={openRecommendModal}
+              class="w-full btn btn-secondary py-4 text-lg flex items-center justify-center gap-2"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+              智能推荐路线
+            </button>
+          </div>
         {:else}
           <div class="card p-6">
             <div class="flex items-center justify-between mb-4">
@@ -466,3 +632,262 @@
     </div>
   {/if}
 </div>
+
+<!-- Recommend Route Modal -->
+{#if showRecommendModal}
+  <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" on:click|self={closeRecommendModal}>
+    <div class="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="p-6 border-b border-natural-200 flex items-center justify-between">
+        <h2 class="text-2xl font-bold text-natural-800">🧠 智能路线推荐</h2>
+        <button on:click={closeRecommendModal} class="text-natural-500 hover:text-natural-700 p-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto">
+        {#if !recommendResult}
+          <div class="p-6">
+            <form on:submit={handleRecommendRoute} class="space-y-6">
+              <div>
+                <label class="label">选择起点</label>
+                <div class="grid grid-cols-2 gap-4">
+                  <label class="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all border-2 {recommendStartType === 'current'
+                    ? 'bg-primary-50 border-primary-400'
+                    : 'bg-natural-50 border-transparent hover:bg-natural-100'}">
+                    <input
+                      type="radio"
+                      bind:group={recommendStartType}
+                      value="current"
+                      class="w-4 h-4 text-primary-600"
+                    />
+                    <div>
+                      <p class="font-medium text-natural-800">📍 当前位置</p>
+                      {#if currentLat && currentLng}
+                        <p class="text-xs text-natural-500">
+                          {currentLat.toFixed(4)}, {currentLng.toFixed(4)}
+                        </p>
+                      {:else}
+                        <p class="text-xs text-natural-400">正在获取位置...</p>
+                      {/if}
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all border-2 {recommendStartType === 'corner'
+                    ? 'bg-primary-50 border-primary-400'
+                    : 'bg-natural-50 border-transparent hover:bg-natural-100'}">
+                    <input
+                      type="radio"
+                      bind:group={recommendStartType}
+                      value="corner"
+                      class="w-4 h-4 text-primary-600"
+                    />
+                    <div>
+                      <p class="font-medium text-natural-800">🏛️ 指定角落</p>
+                      <p class="text-xs text-natural-500">选择一个角落作为起点</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {#if recommendStartType === 'corner'}
+                <div>
+                  <label class="label">选择起点角落</label>
+                  <select bind:value={recommendStartCornerId} class="input">
+                    <option value={null}>请选择起点角落</option>
+                    {#each corners as corner}
+                      <option value={corner.id}>{corner.title}</option>
+                    {/each}
+                  </select>
+                </div>
+              {:else}
+                <button
+                  type="button"
+                  on:click={getCurrentLocation}
+                  class="btn btn-secondary text-sm"
+                >
+                  🔄 重新获取位置
+                </button>
+              {/if}
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="label">探访角落数量</label>
+                  <select bind:value={recommendCornerCount} class="input">
+                    {#each [2, 3, 4, 5, 6, 7, 8, 9, 10] as count}
+                      <option value={count}>{count} 个</option>
+                    {/each}
+                  </select>
+                </div>
+                <div>
+                  <label class="label">分类筛选</label>
+                  <select bind:value={recommendCategory} class="input">
+                    {#each categories as cat}
+                      <option value={cat}>{cat || '全部分类'}</option>
+                    {/each}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="label">难度筛选</label>
+                <div class="flex flex-wrap gap-2">
+                  {#each difficulties as diff}
+                    <label class="inline-flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all border-2 {recommendDifficulty === diff.value
+                      ? 'bg-primary-50 border-primary-400'
+                      : 'bg-natural-50 border-transparent hover:bg-natural-100'}">
+                      <input
+                        type="radio"
+                        bind:group={recommendDifficulty}
+                        value={diff.value}
+                        class="w-4 h-4 text-primary-600"
+                      />
+                      <span class="text-sm">{diff.label}</span>
+                    </label>
+                  {/each}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                class="w-full btn btn-primary py-4 text-lg"
+                disabled={recommendingRoute}
+              >
+                {#if recommendingRoute}
+                  <span class="inline-flex items-center gap-2">
+                    <span class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                    智能计算中...
+                  </span>
+                {:else}
+                  ✨ 开始推荐
+                {/if}
+              </button>
+            </form>
+          </div>
+        {:else}
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-0 h-full">
+            <div class="p-6 border-r border-natural-200 overflow-y-auto">
+              <div class="mb-6">
+                <div class="flex items-center gap-3 mb-4">
+                  <span class="text-3xl">🎉</span>
+                  <div>
+                    <h3 class="text-xl font-bold text-natural-800">推荐成功！</h3>
+                    <p class="text-natural-500">已为您计算最优游览路线</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                  <div class="bg-primary-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-primary-600">{recommendResult.total_distance}</p>
+                    <p class="text-sm text-natural-600">公里</p>
+                  </div>
+                  <div class="bg-secondary-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-secondary-600">{recommendResult.estimated_time}</p>
+                    <p class="text-sm text-natural-600">分钟</p>
+                  </div>
+                  <div class="bg-natural-100 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-natural-600">{recommendResult.corners.length}</p>
+                    <p class="text-sm text-natural-600">个地点</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <h4 class="font-semibold text-natural-800">📍 路线详情</h4>
+                {#each recommendResult.corners as corner, index}
+                  <div class="flex items-start gap-3 p-4 bg-natural-50 rounded-xl">
+                    <span
+                      class="w-8 h-8 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0"
+                      style="background-color: {getRouteColor(index)};"
+                    >
+                      {index + 1}
+                    </span>
+                    <div class="flex-1 min-w-0">
+                      <p class="font-medium text-natural-800">{corner.title}</p>
+                      <p class="text-sm text-natural-500 mt-1 line-clamp-2">{corner.description}</p>
+                      {#if corner.category}
+                        <span class="inline-block mt-2 text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded">
+                          {corner.category}
+                        </span>
+                      {/if}
+                      {#if index < recommendResult.distances.length}
+                        <p class="text-xs text-natural-400 mt-2">
+                          → 下一站 {recommendResult.distances[index]} km
+                        </p>
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+
+              <div class="mt-6 pt-6 border-t border-natural-200">
+                <h4 class="font-semibold text-natural-800 mb-3">💾 保存路线</h4>
+                <div class="space-y-3">
+                  <div>
+                    <label class="label">路线标题 *</label>
+                    <input
+                      type="text"
+                      bind:value={title}
+                      class="input"
+                      placeholder="给这条路线起个名字"
+                      maxlength="100"
+                    />
+                  </div>
+                  <div>
+                    <label class="label">路线描述 *</label>
+                    <textarea
+                      bind:value={description}
+                      class="input min-h-[80px] resize-none"
+                      placeholder="描述这条路线的特色..."
+                      maxlength="500"
+                    ></textarea>
+                  </div>
+                  <button
+                    on:click={handleSaveRecommendRoute}
+                    class="w-full btn btn-primary py-3"
+                    disabled={savingRecommendRoute}
+                  >
+                    {#if savingRecommendRoute}
+                      <span class="inline-flex items-center gap-2">
+                        <span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        保存中...
+                      </span>
+                    {:else}
+                      ✅ 保存为我的路线
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    on:click={() => recommendResult = null}
+                    class="w-full btn btn-outline py-3"
+                  >
+                    🔄 重新推荐
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-6">
+              <h4 class="font-semibold text-natural-800 mb-4">🗺️ 路线地图</h4>
+              <div class="h-[calc(90vh-180px)] min-h-[400px]">
+                {#if recommendMapMarkers.length > 0}
+                  <MapView
+                    markers={recommendMapMarkers}
+                    center={[recommendMapMarkers[0].latitude, recommendMapMarkers[0].longitude]}
+                    zoom={12}
+                  />
+                {:else}
+                  <div class="h-full flex items-center justify-center bg-natural-50 rounded-xl">
+                    <div class="text-center">
+                      <div class="text-4xl mb-3">📍</div>
+                      <p class="text-natural-500">地图加载中...</p>
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
