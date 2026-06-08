@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 
 from ..database import get_db
-from ..models import Corner, User, CheckIn
+from ..models import Corner, User, CheckIn, CornerLike
 from ..schemas import CornerCreate, CornerUpdate, CornerResponse
 from ..auth import get_current_user
+from .achievements import check_and_unlock_achievements
 
 router = APIRouter(prefix="/corners", tags=["Corners"])
 
@@ -98,6 +99,9 @@ async def create_corner(
     db.add(db_corner)
     await db.commit()
     await db.refresh(db_corner)
+
+    await check_and_unlock_achievements(current_user.id, db)
+    await db.commit()
 
     corner_dict = db_corner.__dict__.copy()
     corner_dict['checkin_count'] = 0
@@ -221,3 +225,91 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     return R * c
+
+
+@router.post("/{corner_id}/like")
+async def like_corner(
+    corner_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(Corner).where(Corner.id == corner_id))
+    corner = result.scalar_one_or_none()
+    
+    if not corner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="角落不存在"
+        )
+    
+    if corner.is_hidden:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="此角落已被隐藏"
+        )
+    
+    existing_like_result = await db.execute(
+        select(CornerLike).where(
+            and_(
+                CornerLike.corner_id == corner_id,
+                CornerLike.user_id == current_user.id
+            )
+        )
+    )
+    existing_like = existing_like_result.scalar_one_or_none()
+    
+    if existing_like:
+        await db.delete(existing_like)
+        corner.likes_count = max(0, corner.likes_count - 1)
+        is_liked = False
+    else:
+        new_like = CornerLike(
+            corner_id=corner_id,
+            user_id=current_user.id
+        )
+        db.add(new_like)
+        corner.likes_count += 1
+        is_liked = True
+    
+    await db.commit()
+    
+    await check_and_unlock_achievements(current_user.id, db)
+    await db.commit()
+    
+    return {
+        "success": True,
+        "likes_count": corner.likes_count,
+        "is_liked": is_liked
+    }
+
+
+@router.get("/{corner_id}/like-status")
+async def get_like_status(
+    corner_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(select(Corner).where(Corner.id == corner_id))
+    corner = result.scalar_one_or_none()
+    
+    if not corner:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="角落不存在"
+        )
+    
+    existing_like_result = await db.execute(
+        select(CornerLike).where(
+            and_(
+                CornerLike.corner_id == corner_id,
+                CornerLike.user_id == current_user.id
+            )
+        )
+    )
+    is_liked = existing_like_result.scalar_one_or_none() is not None
+    
+    return {
+        "likes_count": corner.likes_count,
+        "is_liked": is_liked
+    }
+

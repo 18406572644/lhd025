@@ -147,25 +147,65 @@ class AchievementBase(BaseModel):
     name: str
     description: str
     icon: Optional[str] = "🏆"
+    rarity: Optional[str] = "common"
+    points: Optional[int] = 10
     condition_type: str
-    condition_value: int
+    condition_value: float
+    condition_meta: Optional[str] = "{}"
+    is_active: Optional[bool] = True
+    unlock_effect: Optional[str] = "none"
 
 
 class AchievementResponse(AchievementBase):
     id: int
+    global_unlock_rate: Optional[float] = 0.0
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
-class UserAchievementResponse(BaseModel):
+class UserAchievementProgress(BaseModel):
     id: int
     achievement: AchievementResponse
-    unlocked_at: datetime
+    progress: int
+    is_unlocked: bool
+    unlocked_at: Optional[datetime] = None
+    progress_percentage: Optional[float] = 0.0
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class AchievementUnlockResponse(BaseModel):
+    success: bool
+    achievement: AchievementResponse
+    user_achievement: UserAchievementProgress
+    is_new_unlock: bool
+
+
+class UserAchievementStats(BaseModel):
+    total_achievements: int
+    unlocked_count: int
+    total_points: int
+    level: str
+    level_name: str
+    next_level_points: int
+    current_level_progress: float
+    rarity_breakdown: dict
+
+
+class AchievementShareCardResponse(BaseModel):
+    success: bool
+    image_url: str
+    achievement_name: str
+    achievement_icon: str
+    rarity: str
+    unlock_time: datetime
+    global_unlock_rate: float
 
 
 class ShareBase(BaseModel):

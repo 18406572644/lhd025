@@ -34,9 +34,11 @@ class Corner(Base):
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     address = Column(String(255))
+    city = Column(String(100), default="")
     images = Column(String(255), default="")
     tags = Column(String(255), default="")
     difficulty = Column(String(20), default="easy")
+    likes_count = Column(Integer, default=0)
     is_hidden = Column(Boolean, default=False)
     author_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -45,6 +47,19 @@ class Corner(Base):
     author = relationship("User", back_populates="corners")
     checkins = relationship("CheckIn", back_populates="corner")
     route_corners = relationship("RouteCorner", back_populates="corner")
+    likes = relationship("CornerLike", back_populates="corner")
+
+
+class CornerLike(Base):
+    __tablename__ = "corner_likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    corner_id = Column(Integer, ForeignKey("corners.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    corner = relationship("Corner", back_populates="likes")
+    user = relationship("User")
 
 
 class CheckIn(Base):
@@ -96,9 +111,15 @@ class Achievement(Base):
     name = Column(String(50), nullable=False)
     description = Column(Text, nullable=False)
     icon = Column(String(100), default="🏆")
+    rarity = Column(String(20), default="common")
+    points = Column(Integer, default=10)
     condition_type = Column(String(50), nullable=False)
-    condition_value = Column(Integer, default=0)
+    condition_value = Column(Float, default=0)
+    condition_meta = Column(Text, default="{}")
+    is_active = Column(Boolean, default=True)
+    unlock_effect = Column(String(20), default="none")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     users = relationship("UserAchievement", back_populates="achievement")
 
@@ -109,7 +130,11 @@ class UserAchievement(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     achievement_id = Column(Integer, ForeignKey("achievements.id"))
-    unlocked_at = Column(DateTime(timezone=True), server_default=func.now())
+    progress = Column(Integer, default=0)
+    is_unlocked = Column(Boolean, default=False)
+    unlocked_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", back_populates="achievements")
     achievement = relationship("Achievement", back_populates="users")

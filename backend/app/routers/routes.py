@@ -12,6 +12,7 @@ from ..database import get_db
 from ..models import Route, RouteCorner, User, Corner, CheckIn
 from ..schemas import RouteCreate, RouteResponse, CornerResponse, RouteRecommendRequest, RouteRecommendResponse
 from ..auth import get_current_user
+from .achievements import check_and_unlock_achievements
 
 router = APIRouter(prefix="/routes", tags=["Routes"])
 
@@ -143,6 +144,9 @@ async def create_route(
             corner_dict['checkin_count'] = 0
             corner_dict['author'] = corner.author
             corners.append(CornerResponse(**corner_dict))
+
+    await check_and_unlock_achievements(current_user.id, db)
+    await db.commit()
 
     route_dict = db_route.__dict__.copy()
     route_dict['corners'] = corners
