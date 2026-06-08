@@ -9,6 +9,157 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+    
+    html { scroll-behavior: smooth; }
+    
+    body {
+      background: linear-gradient(to bottom right, #fafaf9, rgba(220, 252, 231, 0.3), rgba(224, 242, 254, 0.3));
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #292524;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .btn {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+      padding-top: 0.625rem;
+      padding-bottom: 0.625rem;
+      border-radius: 0.75rem;
+      font-weight: 500;
+      transition-property: all;
+      transition-duration: 300ms;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.5);
+      box-shadow: 0 0 0 2px white, 0 0 0 4px rgba(34, 197, 94, 0.5);
+    }
+    
+    .btn-primary {
+      background-color: #22c55e;
+      color: white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    
+    .btn-primary:hover {
+      background-color: #16a34a;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+    
+    .btn-outline {
+      background-color: transparent;
+      border-width: 2px;
+      border-color: #d6d3d1;
+      color: #44403c;
+    }
+    
+    .btn-outline:hover {
+      border-color: #38bdf8;
+      color: #22c55e;
+    }
+    
+    .card {
+      background-color: white;
+      border-radius: 1rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      transition-property: all;
+      transition-duration: 300ms;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+    
+    .card:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+    
+    .input {
+      width: 100%;
+      padding-left: 1rem;
+      padding-right: 1rem;
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-radius: 0.75rem;
+      border-width: 2px;
+      border-color: #e7e5e4;
+      background-color: white;
+      transition-property: all;
+      transition-duration: 200ms;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .input:focus {
+      border-color: #4ade80;
+      box-shadow: 0 0 0 2px rgba(220, 252, 231, 0.8);
+      outline: none;
+    }
+    
+    .label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #44403c;
+      margin-bottom: 0.5rem;
+    }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+      padding-top: 0.25rem;
+      padding-bottom: 0.25rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #292524;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .gradient-text {
+      background: linear-gradient(to right, #16a34a, #0ea5e9);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    
+    .leaflet-container {
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+    
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    .animate-slide-up {
+      animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+  </style>
   %sveltekit.head%
 </head>
 <body class="bg-natural-50 text-natural-800 font-sans antialiased">

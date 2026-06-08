@@ -1,4 +1,5 @@
 <script>
+  import '../app.css';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { auth } from '$lib/stores/auth';
@@ -44,6 +45,8 @@
 </div>
 
 <style>
+  @import '../app.css';
+
   @keyframes slide-up {
     from {
       opacity: 0;
@@ -70,5 +73,17 @@
 
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
+  }
+
+  :global(html) {
+    scroll-behavior: smooth;
+  }
+
+  :global(body) {
+    @apply bg-gradient-to-br from-natural-50 via-primary-50/30 to-sky-50/30 min-h-screen;
+  }
+
+  :global(.leaflet-container) {
+    @apply rounded-xl overflow-hidden;
   }
 </style>
