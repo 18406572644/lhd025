@@ -5,6 +5,7 @@
   import { cornerStore } from '$lib/stores/corners';
   import MapView from '$lib/components/MapView.svelte';
   import Loading from '$lib/components/Loading.svelte';
+  import ImageUpload from '$lib/components/ImageUpload.svelte';
   import { toast } from '$lib/stores/toast';
 
   let title = '';
@@ -231,18 +232,11 @@
         </div>
 
         <div>
-          <label class="label">封面图片链接</label>
-          <input
-            type="url"
-            bind:value={images}
-            class="input"
-            placeholder="https://example.com/image.jpg"
-          />
-          {#if images}
-            <div class="mt-2 rounded-xl overflow-hidden">
-              <img src={images} alt="预览" class="w-full h-48 object-cover" />
-            </div>
-          {/if}
+          <ImageUpload
+          label="封面图片"
+          bind:value={images}
+          maxSize={10 * 1024 * 1024}
+        />
         </div>
 
         <div>

@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: corner-explorer-backend
+    ports:
+      - "6025:6025"
+    volumes:
+      - ./backend:/app
+      - backend-data:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./corner_explorer.db
+      - SECRET_KEY=corner-explorer-secret-key-2024
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: corner-explorer-frontend
+    ports:
+      - "2025:2025"
+    environment:
+      - NODE_ENV=production
+      - PORT=2025
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  backend-data:

@@ -178,3 +178,37 @@ class UserStatsResponse(BaseModel):
     total_achievements: int
     total_shares: int
     checkin_corners: List[int] = []
+
+
+class ImageResponse(BaseModel):
+    id: int
+    user_id: int
+    filename: str
+    original_filename: str
+    file_size: int
+    width: Optional[int] = None
+    height: Optional[int] = None
+    format: Optional[str] = None
+    thumb_small_url: Optional[str] = None
+    thumb_medium_url: Optional[str] = None
+    thumb_large_url: Optional[str] = None
+    original_url: Optional[str] = None
+    is_public: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ImageUploadResponse(BaseModel):
+    success: bool
+    message: str
+    image: Optional[ImageResponse] = None
+    urls: Optional[dict] = None
+
+
+class ImageListResponse(BaseModel):
+    items: List[ImageResponse]
+    total: int
+    page: int
+    page_size: int

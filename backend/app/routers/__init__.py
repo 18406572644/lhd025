@@ -5,6 +5,7 @@ from .routes import router as routes_router
 from .achievements import router as achievements_router
 from .shares import router as shares_router
 from .users import router as users_router
+from .uploads import router as uploads_router
 
 __all__ = [
     "auth_router",
@@ -14,4 +15,5 @@ __all__ = [
     "achievements_router",
     "shares_router",
     "users_router",
+    "uploads_router",
 ]

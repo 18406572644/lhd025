@@ -21,6 +21,7 @@ class User(Base):
     routes = relationship("Route", back_populates="user")
     achievements = relationship("UserAchievement", back_populates="user")
     shares = relationship("Share", back_populates="user")
+    images = relationship("Image", back_populates="user")
 
 
 class Corner(Base):
@@ -125,3 +126,27 @@ class Share(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="shares")
+
+
+class Image(Base):
+    __tablename__ = "images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    filename = Column(String(255), nullable=False)
+    original_filename = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=False)
+    width = Column(Integer)
+    height = Column(Integer)
+    format = Column(String(20))
+    thumb_small_url = Column(String(500))
+    thumb_medium_url = Column(String(500))
+    thumb_large_url = Column(String(500))
+    original_url = Column(String(500))
+    content_type = Column(String(100))
+    is_public = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="images")
+

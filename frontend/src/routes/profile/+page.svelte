@@ -5,6 +5,7 @@
   import { getCurrentUser, getUserStats, updateUser } from '$lib/api/auth';
   import { getCheckins } from '$lib/api/checkins';
   import Loading from '$lib/components/Loading.svelte';
+  import ImageUpload from '$lib/components/ImageUpload.svelte';
   import { toast } from '$lib/stores/toast';
 
   let user = null;
@@ -15,8 +16,6 @@
   let editAvatar = '';
   let editBio = '';
   let saving = false;
-  let avatarFile = null;
-  let avatarPreview = '';
 
   const statItems = [
     { key: 'total_corners', label: '发布角落', icon: '📍', color: 'text-primary-600' },
@@ -50,7 +49,6 @@
 
       editAvatar = user.avatar || '';
       editBio = user.bio || '';
-      avatarPreview = user.avatar || '';
     } catch (error) {
       toast.error('加载个人信息失败');
     } finally {
@@ -61,30 +59,11 @@
   function startEdit() {
     editAvatar = user.avatar || '';
     editBio = user.bio || '';
-    avatarPreview = user.avatar || '';
-    avatarFile = null;
     editing = true;
   }
 
   function cancelEdit() {
     editing = false;
-    avatarFile = null;
-  }
-
-  function handleAvatarChange(e) {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('图片大小不能超过5MB');
-        return;
-      }
-      avatarFile = file;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        avatarPreview = event.target?.result;
-      };
-      reader.readAsDataURL(file);
-    }
   }
 
   async function handleSave() {
@@ -95,31 +74,8 @@
 
     saving = true;
     try {
-      let avatarUrl = editAvatar;
-      
-      if (avatarFile) {
-        const formData = new FormData();
-        formData.append('file', avatarFile);
-        
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: formData
-        });
-        
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          avatarUrl = uploadData.url;
-        } else {
-          toast.error('头像上传失败');
-          return;
-        }
-      }
-
       const updatedUser = await updateUser({
-        avatar: avatarUrl,
+        avatar: editAvatar,
         bio: editBio.trim()
       });
 
@@ -127,7 +83,6 @@
       auth.fetchCurrentUser();
       
       editing = false;
-      avatarFile = null;
       toast.success('个人资料更新成功');
     } catch (error) {
       toast.error(error.response?.data?.detail || '保存失败，请重试');
@@ -311,26 +266,12 @@
 
           <div class="space-y-6">
             <div class="text-center">
-              <div class="relative inline-block">
-                <img
-                  src={avatarPreview || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + user.username}
-                  alt="头像预览"
-                  class="w-24 h-24 rounded-full mx-auto border-4 border-primary-100 object-cover"
-                />
-                <label class="absolute bottom-0 right-0 w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white cursor-pointer hover:bg-primary-600 transition-colors">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    on:change={handleAvatarChange}
-                    class="hidden"
-                  />
-                </label>
-              </div>
-              <p class="text-xs text-natural-500 mt-2">点击相机图标更换头像</p>
+              <ImageUpload
+                bind:value={editAvatar}
+                label=""
+                circle={true}
+                maxSize={5 * 1024 * 1024}
+              />
             </div>
 
             <div>
