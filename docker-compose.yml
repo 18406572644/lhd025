@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: corner-explorer-backend
     ports:
-      - "6025:6025"
+      - "8000:8000"
     volumes:
       - ./backend:/app
       - backend-data:/app/data

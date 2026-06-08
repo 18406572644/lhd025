@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import hashlib
+import os
+import base64
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,16 +15,47 @@ from .schemas import TokenData
 
 settings = get_settings()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+def _hash_password(password: str, salt: bytes) -> str:
+    key = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt,
+        100000,
+        dklen=32
+    )
+    salt_b64 = base64.b64encode(salt).decode('utf-8')
+    key_b64 = base64.b64encode(key).decode('utf-8')
+    return f"pbkdf2_sha256$100000${salt_b64}${key_b64}"
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = os.urandom(16)
+    return _hash_password(password, salt)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        parts = hashed_password.split('$')
+        if len(parts) != 4:
+            return False
+        algorithm, iterations, salt_b64, key_b64 = parts
+        iterations = int(iterations)
+        salt = base64.b64decode(salt_b64)
+        stored_key = base64.b64decode(key_b64)
+        
+        computed_key = hashlib.pbkdf2_hmac(
+            'sha256',
+            plain_password.encode('utf-8'),
+            salt,
+            iterations,
+            dklen=32
+        )
+        return computed_key == stored_key
+    except Exception:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
